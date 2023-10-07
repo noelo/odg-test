@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    labels:
+      component.opendatahub.io/name: jupyterhub
+      opendatahub.io/component: 'true'
+      opendatahub.io/notebook-image: 'true'
+    annotations:
+      opendatahub.io/notebook-image-url: "https://github.com/thoth-station/s2i-minimal-notebook"
+      opendatahub.io/notebook-image-name: "CUDA"
+      opendatahub.io/notebook-image-desc: "Jupyter notebook image with GPU support and minimal dependency set to start experimenting with Jupyter environment."
+    name: "minimal-gpu"
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - annotations:
+        opendatahub.io/notebook-software: '[{"name":"Python","version":"v3.8"},{"name":"CUDA","version":"11.0"}]'
+        opendatahub.io/notebook-python-dependencies: '[{"name":"JupyterLab","version":"3.0"},{"name":"Notebook","version":"6.3"}]'
+      name: "py3.8-cuda-11.0.3"
+      referencePolicy:
+        type: Local
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    labels:
+      component.opendatahub.io/name: jupyterhub
+      opendatahub.io/component: 'true'
+      opendatahub.io/notebook-image: 'true'
+    annotations:
+      opendatahub.io/notebook-image-url: "https://github.com/thoth-station/s2i-tensorflow-gpu-notebook"
+      opendatahub.io/notebook-image-name: "TensorFlow"
+      opendatahub.io/notebook-image-desc: "Jupyter notebook image with GPU support and includes TensorFlow libraries and dependencies to start experimenting with advanced AI/ML notebooks."
+      opendatahub.io/notebook-image-order: "40"
+    name: "tensorflow-gpu"
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - annotations:
+        opendatahub.io/notebook-software: '[{"name":"Python","version":"v3.8"},{"name":"TensorFlow","version":"2.4"},{"name":"CUDA","version":"11.0"}]'
+        opendatahub.io/notebook-python-dependencies: '[{"name":"TensorFlow","version":"2.4"},{"name":"Tensorboard","version":"2.5"},{"name":"Boto3","version":"1.17"},{"name":"Kafka-Python","version":"2.0"},{"name":"Matplotlib","version":"3.4"},{"name":"Numpy","version":"1.19"},{"name":"Pandas","version":"1.2"},{"name":"Scipy","version":"1.6"}]'
+      name: "py3.8-cuda-11.0.3"
+      referencePolicy:
+        type: Local
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    labels:
+      component.opendatahub.io/name: jupyterhub
+      opendatahub.io/component: 'true'
+      opendatahub.io/notebook-image: 'true'
+    annotations:
+      opendatahub.io/notebook-image-url: "https://github.com/thoth-station/s2i-pytorch-notebook"
+      opendatahub.io/notebook-image-name: "PyTorch"
+      opendatahub.io/notebook-image-desc: "Jupyter notebook image with GPU support and includes PyTorch libraries and dependencies to start experimenting with advanced AI/ML notebooks."
+      opendatahub.io/notebook-image-order: "30"
+    name: "pytorch-gpu"
+  spec:
+    lookupPolicy:
+      local: true
+    tags:
+    - annotations:
+        opendatahub.io/notebook-software: '[{"name":"Python","version":"v3.8"},{"name":"PyTorch","version":"1.8"},{"name":"CUDA","version":"11.0"}]'
+        opendatahub.io/notebook-python-dependencies: '[{"name":"PyTorch","version":"1.9"},{"name":"Tensorboard","version":"1.15"},{"name":"Boto3","version":"1.17"},{"name":"Kafka-Python","version":"2.0"},{"name":"Matplotlib","version":"3.4"},{"name":"Numpy","version":"1.19"},{"name":"Pandas","version":"1.2"},{"name":"Scipy","version":"1.6"}]'
+      name: "py3.8-cuda-11.0.3"
+      referencePolicy:
+        type: Local
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    name: s2i-minimal-gpu-cuda-$(cuda_version)-notebook
+  spec:
+    nodeSelector: null
+    output:
+      to:
+        kind: ImageStreamTag
+        name: 'minimal-gpu:py3.8-cuda-$(cuda_version)'
+    resources:
+      limits:
+        cpu: "4"
+        memory: 8Gi
+      requests:
+        cpu: "2"
+        memory: 4Gi
+    completionDeadlineSeconds: 1800
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 1
+    strategy:
+      type: Docker
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: '$(cuda_version)-cuda-s2i-thoth-ubi8-py38:latest'
+        noCache: true
+        dockerfilePath: Dockerfile
+    postCommit: {}
+    source:
+      type: Git
+      git:
+        uri: 'https://github.com/thoth-station/s2i-minimal-notebook'
+        ref: python38
+    triggers:
+      - type: ImageChange
+        imageChange: {}
+    runPolicy: SerialLatestOnly
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    name: s2i-tensorflow-gpu-cuda-$(cuda_version)-notebook
+  spec:
+    nodeSelector: null
+    output:
+      to:
+        kind: ImageStreamTag
+        name: 'tensorflow-gpu:py3.8-cuda-$(cuda_version)'
+    resources:
+      limits:
+        cpu: "4"
+        memory: 8Gi
+      requests:
+        cpu: "2"
+        memory: 6Gi
+    completionDeadlineSeconds: 1800
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 1
+    strategy:
+      type: Source
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: 'minimal-gpu:py3.8-cuda-$(cuda_version)'
+    postCommit: {}
+    source:
+      type: Git
+      git:
+        uri: 'https://github.com/thoth-station/s2i-tensorflow-gpu-notebook'
+        ref: python38
+    triggers:
+      - type: ImageChange
+        imageChange: {}
+    runPolicy: SerialLatestOnly
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    name: s2i-pytorch-gpu-cuda-$(cuda_version)-notebook
+  spec:
+    nodeSelector: null
+    output:
+      to:
+        kind: ImageStreamTag
+        name: 'pytorch-gpu:py3.8-cuda-$(cuda_version)'
+    resources:
+      limits:
+        cpu: "4"
+        memory: 8Gi
+      requests:
+        cpu: "2"
+        memory: 6Gi
+    completionDeadlineSeconds: 1800
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 1
+    strategy:
+      type: Source
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: 'minimal-gpu:py3.8-cuda-$(cuda_version)'
+    postCommit: {}
+    source:
+      type: Git
+      git:
+        uri: 'https://github.com/thoth-station/s2i-pytorch-notebook'
+        ref: python38
+    triggers:
+      - type: ImageChange
+        imageChange: {}
+    runPolicy: SerialLatestOnly
